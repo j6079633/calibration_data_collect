@@ -4,9 +4,9 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
-#import pyrealsense2 as rs
-#import numpy as np
-#import cv2
+import pyrealsense2 as rs
+import numpy as np
+import cv2
 
 #from robot.controller import Controller
 #from robot.gripper import Gripper
@@ -21,6 +21,7 @@ class StreamThread(QThread):
         self.pipeline = rs.pipeline()
         self.config = rs.config()
         self.config.enable_stream(rs.stream.color, 1280, 720, rs.format.bgr8, 30)
+        profile = self.pipeline.start(self.config)
     def __del__(self):
         self.pipeline.stop()
         self.wait()
@@ -177,7 +178,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         super(MainWindow, self).__init__(parent)
         self.setupUi(self)
         #self._arm = ArmThread()
-        #self._stream_thread = StreamThread()
+        self._stream_thread = StreamThread()
+        self._stream_thread.start()
         self._stream_thread.img_trigger.connect(self.updateRGBFrame)
 
         shift_scale = 10
@@ -251,12 +253,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     
     def save(self):
         # TODO: set save path with date and num
-        pose = self._arm.getPose()
+        #pose = self._arm.getPose()
         im = self._stream_thread.saveImg()
         print("save")
 
     def updateRGBFrame(self, rgb_image):        
-        self._rgb_image = QImage(rgb_image[0][:], rgb_image[0].shape[1], rgb_image[0].shape[0], rgb_image[0].shape[1] * 3, QImage.Format_RGB888)        
+        self._rgb_image = QImage(rgb_image[:], rgb_image.shape[1], rgb_image.shape[0], rgb_image.shape[1] * 3, QImage.Format_RGB888)        
         self.image_window.setPixmap(QPixmap.fromImage(self._rgb_image))
         QApplication.processEvents()
 
