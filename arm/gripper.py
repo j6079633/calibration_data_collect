@@ -12,7 +12,7 @@ class Gripper:
 
     def gripper_setup(self):
         try:
-            self.ser = serial.Serial(port='COM7', baudrate=115200, timeout=0.1, parity=serial.PARITY_NONE,
+            self.ser = serial.Serial(port='/dev/ttyUSB0', baudrate=115200, timeout=0.1, parity=serial.PARITY_NONE,
                                  stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS)
         except serial.serialutil.SerialException as e:
             print(e)

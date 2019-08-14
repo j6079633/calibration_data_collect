@@ -8,8 +8,8 @@ import pyrealsense2 as rs
 import numpy as np
 import cv2
 
-#from robot.controller import Controller
-#from robot.gripper import Gripper
+from arm.controller import Controller
+from arm.gripper import Gripper
 import time
 
 class StreamThread(QThread):
@@ -49,7 +49,8 @@ class StreamThread(QThread):
         finally:
             self._mutex.unlock()
     def saveImg(self, path):
-        cv2.imwrite(path, self.color_image)
+        img = cv2.cvtColor(self.color_image, cv2.COLOR_BGR2RGB)
+        cv2.imwrite(path, img)
 
 class ArmThread(QThread):
     # control signal: working signal of robotarm
@@ -58,6 +59,7 @@ class ArmThread(QThread):
         self._mutex = QMutex()
         self.cntrl = Controller()
         self.grip = Gripper()
+        self.initArmGripper()
         self.trans_mat = np.array([
             [0.6219, -0.0021, 0.],
             [-0.0028, -0.6218, 0.],
@@ -93,6 +95,7 @@ class ArmThread(QThread):
 
     def move(self, pos):
         self.cntrl.move_robot_pos(pos[0], pos[1], pos[2], pos[3], pos[4], pos[5], 2000)
+        #print(pos)
         self.cntrl.wait_move_end()
 
     def goHome(self):
@@ -107,7 +110,8 @@ class ArmThread(QThread):
             scale = scale
         else:
             scale = scale*(-1)
-        new_pos = [current_pos[0]+scale, current_pos[1], current_pos[2], current_pos[3], current_pos[4],current_pos[5]]
+        new_pos = [str(int(current_pos[0])+scale), current_pos[1], current_pos[2], current_pos[3], current_pos[4],current_pos[5]]
+        self.move(new_pos)
         self.pose = new_pos
     
     def Y_move(self, plus_or_minus, scale):
@@ -118,7 +122,8 @@ class ArmThread(QThread):
             scale = scale
         else:
             scale = scale*(-1)
-        new_pos = [current_pos[0], current_pos[1]+scale, current_pos[2], current_pos[3], current_pos[4],current_pos[5]]
+        new_pos = [current_pos[0], str(int(current_pos[1])+scale), current_pos[2], current_pos[3], current_pos[4],current_pos[5]]
+        self.move(new_pos)
         self.pose = new_pos
     
     def Z_move(self, plus_or_minus, scale):
@@ -129,7 +134,8 @@ class ArmThread(QThread):
             scale = scale
         else:
             scale = scale*(-1)
-        new_pos = [current_pos[0], current_pos[1], current_pos[2]+scale, current_pos[3], current_pos[4],current_pos[5]]
+        new_pos = [current_pos[0], current_pos[1], str(int(current_pos[2])+scale), current_pos[3], current_pos[4],current_pos[5]]
+        self.move(new_pos)
         self.pose = new_pos
 
     def Rx_move(self, plus_or_minus, scale):
@@ -140,7 +146,8 @@ class ArmThread(QThread):
             scale = scale
         else:
             scale = scale*(-1)
-        new_pos = [current_pos[0], current_pos[1], current_pos[2], current_pos[3]+scale, current_pos[4],current_pos[5]]
+        new_pos = [current_pos[0], current_pos[1], current_pos[2], str(int(current_pos[3])+scale), current_pos[4],current_pos[5]]
+        self.move(new_pos)
         self.pose = new_pos
 
     def Ry_move(self, plus_or_minus, scale):
@@ -151,7 +158,8 @@ class ArmThread(QThread):
             scale = scale
         else:
             scale = scale*(-1)
-        new_pos = [current_pos[0], current_pos[1], current_pos[2], current_pos[3], current_pos[4]+scale,current_pos[5]]
+        new_pos = [current_pos[0], current_pos[1], current_pos[2], current_pos[3], str(int(current_pos[4])+scale),current_pos[5]]
+        self.move(new_pos)
         self.pose = new_pos
 
     def Rz_move(self, plus_or_minus, scale):
@@ -162,7 +170,8 @@ class ArmThread(QThread):
             scale = scale
         else:
             scale = scale*(-1)
-        new_pos = [current_pos[0], current_pos[1], current_pos[2], current_pos[3], current_pos[4],current_pos[5]+scale]
+        new_pos = [current_pos[0], current_pos[1], current_pos[2], current_pos[3], current_pos[4],str(int(current_pos[5])+scale)]
+        self.move(new_pos)
         self.pose = new_pos
 
     def running(self):
@@ -177,19 +186,19 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
         self.setupUi(self)
-        #self._arm = ArmThread()
+        self._arm = ArmThread()
         self._stream_thread = StreamThread()
         self._stream_thread.start()
         self._stream_thread.img_trigger.connect(self.updateRGBFrame)
 
-        shift_scale = 10
+        shift_scale = 1000
         self.x_plus.clicked.connect(lambda: self.moveArm("x+", shift_scale))
         self.x_minus.clicked.connect(lambda: self.moveArm("x-", shift_scale))
         self.y_plus.clicked.connect(lambda: self.moveArm("y+", shift_scale))
         self.y_minus.clicked.connect(lambda: self.moveArm("y-", shift_scale))
         self.z_plus.clicked.connect(lambda: self.moveArm("z+", shift_scale))
         self.z_minus.clicked.connect(lambda: self.moveArm("z-", shift_scale))
-        rotate_scale = 2
+        rotate_scale = 10000
         self.rx_plus.clicked.connect(lambda: self.moveArm("rx+", rotate_scale))
         self.rx_minus.clicked.connect(lambda: self.moveArm("rx-", rotate_scale))
         self.ry_plus.clicked.connect(lambda: self.moveArm("ry+", rotate_scale))
@@ -201,60 +210,65 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.gripper_off.clicked.connect(lambda: self.grip_ctrl(False))
 
         self.save_btn.clicked.connect(self.save)
+        self.cur_im = 0
 
     def moveArm(self, arg, scale):
         if arg == "x+":
-            #self._arm.X_move(True, scale)
-            print("x+")
+            self._arm.X_move(True, scale)
+            #print("x+")
         elif arg == "x-":
-            #self._arm.X_move(False, scale)
-            print("x-")
+            self._arm.X_move(False, scale)
+            #print("x-")
         elif arg == "y+":
-            #self._arm.Y_move(True, scale)
-            print("y+")
+            self._arm.Y_move(True, scale)
+            #print("y+")
         elif arg == "y-":
-            #self._arm.Y_move(False, scale)
-            print("y-")
+            self._arm.Y_move(False, scale)
+            #print("y-")
         elif arg == "z+":
-            #self._arm.Z_move(True, scale)
-            print("z+")
+            self._arm.Z_move(True, scale)
+            #print("z+")
         elif arg == "z-":
-            #self._arm.Z_move(False, scale)
-            print("z-")
+            self._arm.Z_move(False, scale)
+            #print("z-")
         elif arg == "rx+":
-            #self._arm.Rx_move(True, scale)
-            print("rx+")
+            self._arm.Rx_move(True, scale)
+            #print("rx+")
         elif arg == "rx-":
-            #self._arm.Rx_move(False, scale)
-            print("rx-")
+            self._arm.Rx_move(False, scale)
+            #print("rx-")
         elif arg == "ry+":
-            #self._arm.Ry_move(True, scale)
-            print("ry+")
+            self._arm.Ry_move(True, scale)
+            #print("ry+")
         elif arg == "ry-":
-            #self._arm.Ry_move(False, scale)
-            print("ry-")
+            self._arm.Ry_move(False, scale)
+            #print("ry-")
         elif arg == "rz+":
-            #self._arm.Rz_move(True, scale)
-            print("rz+")
+            self._arm.Rz_move(True, scale)
+            #print("rz+")
         elif arg == "rz-":
-            #self._arm.Rz_move(False, scale)
-            print("rz-")
+            self._arm.Rz_move(False, scale)
+            #print("rz-")
         else:
             pass
     
     def grip_ctrl(self, on_off):
         if on_off:
-            #self._arm.gripperOn()
+            self._arm.gripperOn()
             print("gripper on")
         else:
-            #self._arm.gripperOff()
+            self._arm.gripperOff()
             print("gripper off")
     
     
     def save(self):
         # TODO: set save path with date and num
-        #pose = self._arm.getPose()
-        im = self._stream_thread.saveImg()
+        pose = self._arm.getPose()
+        self.cur_im += 1
+        with open('./pose.txt', 'a') as f:
+            f.write("{} [{},{},{},{},{},{}]\n".format(self.cur_im, pose[0], pose[1], pose[2], pose[3], pose[4], pose[5]))
+        
+        self._stream_thread.saveImg("./img/"+str(self.cur_im)+".png")
         print("save")
 
     def updateRGBFrame(self, rgb_image):        

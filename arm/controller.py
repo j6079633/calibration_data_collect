@@ -1,5 +1,5 @@
 from . import communicate
-
+import time
 
 class Controller:
     def __init__(self):
@@ -377,3 +377,13 @@ class Controller:
             return True
         else:
             return False
+    
+
+    def wait_move_end(self):
+        pos1 = self.get_robot_pos()
+        time.sleep(0.1)
+        pos2 = self.get_robot_pos()
+        while pos1 != pos2:
+            pos1 = pos2
+            time.sleep(0.1)
+            pos2 = self.get_robot_pos()
